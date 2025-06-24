@@ -6,8 +6,7 @@ It leverages pre-trained ResNet models and ensemble techniques for improved accu
 ## Dataset
 
 Name: PlantVillage Dataset
-Description: 70,000+ labeled plant leaf images (healthy & diseased) across 9 species.
-Used ~10,500 images for training and ~2,000 for validation/testing due to hardware limitations.
+Description: 70,000+ labeled plant leaf images (healthy & diseased) across 9 species. Used ~10,500 images for training and ~2,000 for validation/testing due to hardware limitations.
 
 ## Features
 
@@ -27,7 +26,7 @@ Deployment: Local
 Overall models have an accuracy of 95% and above
 
 ## How To Run The Project
-- Download the dataset
+- Download the dataset (https://www.kaggle.com/datasets/abdallahalidev/plantvillage-dataset)
 - Extract it and place it in an accessible directory on your machine.
 - Install Dependencies (use a virtual machine)
 - Run model.py to train the 5 base models
