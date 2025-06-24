@@ -1,0 +1,176 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, 
+body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: #0E191A;
+    font-family: "Neue Montreal";
+}
+
+img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.content {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+nav {
+    width: 100%;
+    padding: 2.5em 0; 
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 3em;
+}
+
+.nav-button {
+    padding: 14px 28px;
+    background-color: #A7DADC;
+    color: #07292C;
+    border: none;
+    border-radius: 50px; 
+    cursor: pointer;
+    font-size: 1.1em;
+    opacity: 0; 
+    transform: translateY(20px); 
+    transition: background-color 0.3s, transform 0.3s, opacity 0.3s;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.nav-button:hover {
+    background-color: #56CFE1;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+
+.hero {
+    position: relative; 
+    width: 95%;
+    display: flex;
+    flex-direction: column; 
+    align-items: center; 
+    color: #fff;
+    margin-bottom: 20px; 
+    gap: 10px;
+}
+
+.icon, 
+.icon-2 {
+     flex: 0.5;
+     padding: 0 5em;
+     font-size: 30px;
+     opacity: 0.5;
+}
+
+.icon-2 {
+    text-align: right;
+}
+
+.icon ion-icon, 
+.icon-2 ion-icon {
+    transform: scale(0);
+}
+
+.title {
+    flex: 2;
+    text-align: center;
+    font-size: 40px;
+}
+
+.title p {
+    position: relative;
+    opacity: 0;
+    transform: translateY(20px); 
+}
+
+footer {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+}
+
+.container {
+    position: fixed; 
+    width: 100%;
+    height: 100%;
+    display: flex;
+    gap: 1em;
+}
+
+.container .col {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1em;
+}
+
+.col .item {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    background: gray;
+    overflow: hidden;
+}
+
+.c-1, 
+.c-3,
+.c-5 {
+    top: 100%;
+} 
+
+.c-1 .item, 
+.c-3 .item,
+.c-5 .item {
+    top: 100%;
+}
+
+.c-2 .item,
+.c-4 .item {
+    top: -100%;
+}
+
+@media (max-width: 900px) {
+    .slide-num {
+        text-align: left;
+        padding-left: 2em;
+        margin-bottom: 2.5em;
+    }
+
+    .title {
+        font-size: 30px;
+    }
+
+    .icon,
+    .icon-2 {
+        padding: 0 1em;
+        font-size: 16px;
+    }
+
+    .preview img  {
+        width: 60px;
+        height: 40px;
+    }
+}
+
+.nav-button {
+    opacity: 0; 
+    transform: translateY(20px); 
+}

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Predict</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/predict.css') }}">
+</head>
+<body>
+    <div class="content">
+        <h1>Predict Plant Disease</h1>
+        <form id="predictForm" enctype="multipart/form-data">
+            <input type="file" name="file" accept="image/*" required>
+            <button type="submit">Submit</button>
+        </form>
+        <div id="loading" style="display: none;">
+            <div class="spinner"></div>
+            <span>Processing...</span>
+        </div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // Function to format names by replacing underscores with spaces and capitalizing each word
+        function formatName(name) {
+            return name.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+        }
+    
+        document.getElementById('predictForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+            const resultDiv = document.getElementById('result');
+            const loadingDiv = document.getElementById('loading');
+    
+            resultDiv.innerHTML = '';
+            loadingDiv.style.display = 'flex';
+    
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json().then(data => ({status: response.status, body: data})))
+            .then(({status, body}) => {
+                loadingDiv.style.display = 'none';
+                if (status === 200) {
+                    let resultHTML = `<p><strong>Plant Name:</strong> ${formatName(body.plant_name)}</p>`;
+
+                    if (body.plant_name === "No Leaf") {
+                        resultHTML += `<p style="color: orange;"><strong>Note:</strong> The image contains no leaves.</p>`;
+                    } else {
+                        const condition = body.is_healthy ? "Healthy" : "Diseased";
+                        resultHTML += `<p><strong>Condition:</strong> ${condition}</p>`;
+                        if (!body.is_healthy && body.disease) {
+                            const formattedDisease = formatName(body.disease);
+                            resultHTML += `<p><strong>Disease:</strong> ${formattedDisease}</p>`;
+                        }
+                    }
+
+                    resultHTML += `<p><strong>Confidence:</strong> ${body.confidence.toFixed(2)}%</p>
+                                   <button id="doneButton">Done</button>`;
+                    resultDiv.innerHTML = resultHTML;
+
+                    document.getElementById('doneButton').addEventListener('click', function() {
+                        window.location.href = '/';
+                    });
+                } else {
+                    resultDiv.innerHTML = `<p style="color: red;"><strong>Error:</strong> ${body.error}</p>`;
+                    if (body.message) {
+                        resultDiv.innerHTML += `<p style="color: red;"><strong>Message:</strong> ${body.message}</p>`;
+                    }
+                }
+            })
+            .catch(error => {
+                loadingDiv.style.display = 'none';
+                console.error('Error:', error);
+                resultDiv.innerHTML = `<p style="color: red;">An unexpected error occurred.</p>`;
+            });
+        });
+    </script>      
+</body>
+</html>

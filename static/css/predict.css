@@ -1,0 +1,163 @@
+/* Reset some default styles for consistency across browsers */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-image: linear-gradient(to top right, #0E191A, #07292C);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: "Neue Montreal", sans-serif;
+    color: #fff;
+    padding-top: 80px; /* To prevent content from being hidden behind the nav */
+}
+
+.content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px 20px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border-radius: 10px;
+    max-width: 600px;
+    width: 90%;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+h1 {
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 2em;
+    color: #A7DADC;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+input[type="file"] {
+    margin-bottom: 20px;
+    padding: 12px;
+    border: 2px solid #fff;
+    border-radius: 5px;
+    background-color: #07292C;
+    color: #fff;
+    width: 100%;
+    transition: border-color 0.3s, background-color 0.3s;
+}
+
+input[type="file"]:hover {
+    border-color: #A7DADC;
+    background-color: #09575D;
+}
+
+button {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 5px;
+    background-color: #004d40;
+    color: #fff;
+    font-size: 1.1em;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s;
+    width: 100%;
+}
+
+button:hover {
+    background-color: #00796b;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#loading {
+    margin-top: 20px;
+    font-size: 1.1em;
+    color: #FFD700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+.spinner {
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top: 4px solid #FFD700;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    animation: spin 1s linear infinite;
+    margin-right: 10px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+#result {
+    margin-top: 20px;
+    text-align: center;
+    width: 100%;
+}
+
+#result p {
+    margin: 8px 0;
+    font-size: 1.1em;
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 10px;
+    border-radius: 5px;
+}
+
+#result p strong {
+    color: #A7DADC;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+    h1 {
+        font-size: 1.8em;
+    }
+
+    button {
+        font-size: 1em;
+    }
+
+    input[type="file"] {
+        font-size: 0.9em;
+    }
+
+    #result p {
+        font-size: 1em;
+    }
+}
+
+button#doneButton {
+    margin-top: 20px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    background-color: #A7DADC;
+    color: #07292C;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s;
+}
+
+button#doneButton:hover {
+    background-color: #56CFE1;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
