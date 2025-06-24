@@ -1,206 +1,259 @@
+# Necessary imports
 import os
-import numpy as np
-import pandas as pd
 import torch
-import matplotlib.pyplot as plt
 import torch.nn as nn
-from torch.utils.data import DataLoader
-from PIL import Image
-import torch.nn.functional as F
-import torchvision.transforms as transforms
-from torchvision.utils import make_grid
+import torch.optim as optim
+import torchvision.models as models
+from torch.utils.data import DataLoader, Dataset, Subset
 from torchvision.datasets import ImageFolder
-from torchsummary import summary
+from torchvision import transforms
+from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
+from sklearn.model_selection import KFold
 
-# Make sure you are using the correct device for M1 GPU
+# Data Pre-Processing with Data Augmentation
+train_transform = transforms.Compose([
+    transforms.Resize((224, 224)),           
+    transforms.RandomHorizontalFlip(),        
+    transforms.RandomRotation(20),            
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2),  
+    transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)), 
+    transforms.ToTensor(),                    
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),  
+    transforms.RandomErasing(p=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3)),
+])
+
+valid_transform = transforms.Compose([
+    transforms.Resize((256, 256)),            
+    transforms.ToTensor(),                    
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  
+])
+
+# Device Management
 def get_default_device():
     """Pick GPU if available, else CPU"""
-    if torch.backends.mps.is_available():  # For M1 GPU
+    if torch.backends.mps.is_available():
         return torch.device("mps")
-    else:
-        return torch.device("cpu")
+    return torch.device("cpu")
 
 device = get_default_device()
 
-# Move data to device
 def to_device(data, device):
     """Move tensor(s) to chosen device"""
     if isinstance(data, (list, tuple)):
         return [to_device(x, device) for x in data]
     return data.to(device, non_blocking=True)
 
-# For loading data into device
-class DeviceDataLoader():
+print(f"Using device: {device}")
+
+class DeviceDataLoader:
     """Wrap a dataloader to move data to a device"""
     def __init__(self, dl, device):
         self.dl = dl
         self.device = device
-        
+        self.dataset = dl.dataset  # Store reference to dataset
+
     def __iter__(self):
         """Yield a batch of data after moving it to device"""
         for b in self.dl:
             yield to_device(b, self.device)
-        
+
     def __len__(self):
         """Number of batches"""
         return len(self.dl)
 
-# Set directories and data
-data_dir = "../input/new-plant-diseases-dataset/New Plant Diseases Dataset(Augmented)/New Plant Diseases Dataset(Augmented)"
-train_dir = data_dir + "/train"
-valid_dir = data_dir + "/valid"
-diseases = os.listdir(train_dir)
+    def get_dataset_len(self):
+        """Get the length of the dataset"""
+        return len(self.dataset)
 
-# Print disease names and other details
-print(diseases)
-print("Total disease classes are: {}".format(len(diseases)))
+# Data Directory Setup
+data_dir = "/Users/gracegomes/Desktop/Detector/PlantVillage"
+train_dir = os.path.join(data_dir, "train")
 
-plants = []
-NumberOfDiseases = 0
-for plant in diseases:
-    if plant.split('___')[0] not in plants:
-        plants.append(plant.split('___')[0])
-    if plant.split('___')[1] != 'healthy':
-        NumberOfDiseases += 1
+# Load the dataset
+full_dataset = ImageFolder(train_dir, transform=train_transform)
 
-print(f"Unique Plants are: \n{plants}")
-print("Number of plants: {}".format(len(plants)))
-print("Number of diseases: {}".format(NumberOfDiseases))
+# Get the class names
+diseases = full_dataset.classes
 
-# Number of images for each disease
-nums = {}
-for disease in diseases:
-    nums[disease] = len(os.listdir(train_dir + '/' + disease))
-
-img_per_class = pd.DataFrame(nums.values(), index=nums.keys(), columns=["no. of images"])
-img_per_class
-
-# Plotting number of images available for each disease
-index = [n for n in range(38)]
-plt.figure(figsize=(20, 5))
-plt.bar(index, [n for n in nums.values()], width=0.3)
-plt.xlabel('Plants/Diseases', fontsize=10)
-plt.ylabel('No of images available', fontsize=10)
-plt.xticks(index, diseases, fontsize=5, rotation=90)
-plt.title('Images per each class of plant disease')
-
-n_train = 0
-for value in nums.values():
-    n_train += value
-print(f"There are {n_train} images for training")
-
-# Datasets for validation and training
-train = ImageFolder(train_dir, transform=transforms.ToTensor())
-valid = ImageFolder(valid_dir, transform=transforms.ToTensor())
-
-img, label = train[0]
-print(img.shape, label)
-
-# Total number of classes in train set
-print(len(train.classes))
-
-# Function to show images
-def show_image(image, label):
-    print("Label :" + train.classes[label] + "(" + str(label) + ")")
-    plt.imshow(image.permute(1, 2, 0))
-
-show_image(*train[0])
-
-# Setting the seed value
-random_seed = 7
-torch.manual_seed(random_seed)
-
-# Setting the batch size
-batch_size = 32
-
-# DataLoaders for training and validation
-train_dl = DataLoader(train, batch_size, shuffle=True, num_workers=2, pin_memory=True)
-valid_dl = DataLoader(valid, batch_size, num_workers=2, pin_memory=True)
-
-# Helper function to show a batch of training instances
-def show_batch(data):
-    for images, labels in data:
-        fig, ax = plt.subplots(figsize=(30, 30))
-        ax.set_xticks([]); ax.set_yticks([])
-        ax.imshow(make_grid(images, nrow=8).permute(1, 2, 0))
-        break
-
-# Images for the first batch of training
-show_batch(train_dl)
-
-# Define the SimpleResidualBlock
-class SimpleResidualBlock(nn.Module):
-    def __init__(self):
+# Pretrained ResNet Model Definition
+class PretrainedResNet(nn.Module):
+    """A ResNet model with pretrained weights for image classification"""
+    def __init__(self, num_classes):
         super().__init__()
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=3, kernel_size=3, stride=1, padding=1)
-        self.relu1 = nn.ReLU()
-        self.conv2 = nn.Conv2d(in_channels=3, out_channels=3, kernel_size=3, stride=1, padding=1)
-        self.relu2 = nn.ReLU()
-        
-    def forward(self, x):
-        out = self.conv1(x)
-        out = self.relu1(out)
-        out = self.conv2(out)
-        return self.relu2(out) + x
+        # Load pretrained ResNet18 model
+        self.network = models.resnet18(pretrained=True)
 
-# Define accuracy function
-def accuracy(outputs, labels):
-    _, preds = torch.max(outputs, dim=1)
-    return torch.tensor(torch.sum(preds == labels).item() / len(preds))
+        # Freeze all layers
+        for param in self.network.parameters():
+            param.requires_grad = False
 
-# Base class for the model
-class ImageClassificationBase(nn.Module):
-    def training_step(self, batch):
-        images, labels = batch
-        out = self(images)
-        loss = F.cross_entropy(out, labels)
-        return loss
-    
-    def validation_step(self, batch):
-        images, labels = batch
-        out = self(images)
-        loss = F.cross_entropy(out, labels)
-        acc = accuracy(out, labels)
-        return {"val_loss": loss.detach(), "val_accuracy": acc}
-    
-    def validation_epoch_end(self, outputs):
-        batch_losses = [x["val_loss"] for x in outputs]
-        batch_accuracy = [x["val_accuracy"] for x in outputs]
-        epoch_loss = torch.stack(batch_losses).mean()
-        epoch_accuracy = torch.stack(batch_accuracy).mean()
-        return {"val_loss": epoch_loss, "val_accuracy": epoch_accuracy}
-    
-    def epoch_end(self, epoch, result):
-        print("Epoch [{}], last_lr: {:.5f}, train_loss: {:.4f}, val_loss: {:.4f}, val_acc: {:.4f}".format(
-            epoch, result['lrs'][-1], result['train_loss'], result['val_loss'], result['val_accuracy']))
+        # Unfreeze the last few layers (fine-tuning)
+        for param in self.network.layer4.parameters():
+            param.requires_grad = True
 
-# Define the ConvBlock and ResNet9 model
-def ConvBlock(in_channels, out_channels, pool=False):
-    layers = [nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
-             nn.BatchNorm2d(out_channels),
-             nn.ReLU(inplace=True)]
-    if pool:
-        layers.append(nn.MaxPool2d(4))
-    return nn.Sequential(*layers)
+        # Modify the last fully connected layer to match the number of classes
+        self.network.fc = nn.Linear(self.network.fc.in_features, num_classes)
 
-class ResNet9(ImageClassificationBase):
-    def __init__(self, in_channels, num_diseases):
-        super().__init__()
-        self.conv1 = ConvBlock(in_channels, 64)
-        self.conv2 = ConvBlock(64, 128, pool=True)
-        self.res1 = nn.Sequential(ConvBlock(128, 128), ConvBlock(128, 128))
-        self.conv3 = ConvBlock(128, 256, pool=True)
-        self.conv4 = ConvBlock(256, 512, pool=True)
-        self.res2 = nn.Sequential(ConvBlock(512, 512), ConvBlock(512, 512))
-        self.classifier = nn.Sequential(nn.MaxPool2d(4),
-                                       nn.Flatten(),
-                                       nn.Linear(512, num_diseases))
-        
     def forward(self, xb):
-        out = self.conv1(xb)
-        out = self.conv2(out)
-        out = self.res1(out) + out
-        out = self.conv3(out)
-        out = self.conv4(out)
-        out = self.res2(out) + out
+        return self.network(xb)
 
+# Training and Validation Functions
+def validate_model(model, valid_loader):
+    """Validate the model"""
+    model.eval()
+    valid_loss = 0.0
+    correct = 0
+    total = 0
+    criterion = nn.CrossEntropyLoss()
+
+    all_labels = []
+    all_preds = []
+
+    with torch.no_grad():
+        for batch_idx, (images, labels) in enumerate(valid_loader):
+            images, labels = images.to(device), labels.to(device)  # Move to device
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            
+            valid_loss += loss.item() * images.size(0)
+            _, predicted = torch.max(outputs, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+            # Collect all predictions and true labels for additional metrics
+            all_labels.extend(labels.cpu().numpy())
+            all_preds.extend(predicted.cpu().numpy())
+
+    avg_loss = valid_loss / len(valid_loader.dataset)
+    accuracy = correct / total
+
+    # Calculate additional metrics
+    precision = precision_score(all_labels, all_preds, average='weighted', zero_division=0)
+    recall = recall_score(all_labels, all_preds, average='weighted', zero_division=0)
+    f1 = f1_score(all_labels, all_preds, average='weighted', zero_division=0)
+    conf_matrix = confusion_matrix(all_labels, all_preds)
+
+    print(f"Validation - Average Loss: {avg_loss:.4f}, Accuracy: {accuracy:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, F1 Score: {f1:.4f}")
+    # print(f"Confusion Matrix:\n{conf_matrix}")  # Optional
+
+    return {"val_loss": avg_loss, "val_accuracy": accuracy, "precision": precision, "recall": recall, "f1": f1}
+
+def train_model(model, train_loader, valid_loader, epochs=10, lr=0.001):
+    optimizer = optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=lr)
+    criterion = nn.CrossEntropyLoss()
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+
+    best_f1 = 0
+
+    for epoch in range(epochs):
+        model.train()
+        running_loss = 0.0
+        correct = 0
+        total = 0
+        print(f"Epoch {epoch + 1}/{epochs} - Training started...")
+
+        all_train_labels = []
+        all_train_preds = []
+
+        for batch_idx, (images, labels) in enumerate(train_loader):
+            images, labels = images.to(device), labels.to(device)
+            optimizer.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item() * images.size(0)
+            _, preds = torch.max(outputs, dim=1)
+            correct += (preds == labels).sum().item()
+            total += labels.size(0)
+
+            # Collect labels and predictions for calculating metrics
+            all_train_labels.extend(labels.cpu().numpy())
+            all_train_preds.extend(preds.cpu().numpy())
+
+            if (batch_idx + 1) % 50 == 0:
+                current_loss = running_loss / ((batch_idx + 1) * train_loader.dl.batch_size)
+                print(f"Epoch [{epoch + 1}], Batch [{batch_idx + 1}/{len(train_loader)}], Training Loss: {current_loss:.4f}")
+
+        epoch_loss = running_loss / train_loader.get_dataset_len()
+        train_accuracy = correct / total  
+        train_f1 = f1_score(all_train_labels, all_train_preds, average='weighted', zero_division=0)
+        
+        print(f"Epoch {epoch + 1}/{epochs} completed. Training Loss: {epoch_loss:.4f}, Training Accuracy: {train_accuracy:.4f}, F1 Score: {train_f1:.4f}")
+
+        valid_metrics = validate_model(model, valid_loader)
+        current_f1 = valid_metrics['f1']
+
+        if valid_metrics['val_accuracy'] < train_accuracy:
+            print(f"Potential overfitting: Training Accuracy = {train_accuracy:.4f}, Validation Accuracy = {valid_metrics['val_accuracy']:.4f}")
+
+        if current_f1 > best_f1:
+            best_f1 = current_f1
+            print(f"New best F1 score: {best_f1:.4f}.")
+
+        scheduler.step()
+
+    return best_f1
+
+# Define your batch size and number of epochs here
+batch_size = 32
+num_epochs = 10
+k_folds = 5
+
+# Prepare cross-validation
+kfold = KFold(n_splits=k_folds, shuffle=True)
+
+# Lists to hold the results
+fold_results = {}
+
+print('--------------------------------')
+
+for fold, (train_ids, valid_ids) in enumerate(kfold.split(full_dataset)):
+    print(f'FOLD {fold+1}')
+    print('--------------------------------')
+
+    # Sample elements randomly from a given list of ids, no replacement.
+    train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
+    valid_subsampler = torch.utils.data.SubsetRandomSampler(valid_ids)
+
+    # Define data loaders for training and testing data in this fold
+    train_loader = DeviceDataLoader(DataLoader(
+                      full_dataset, 
+                      batch_size=batch_size, sampler=train_subsampler), device)
+    valid_loader = DeviceDataLoader(DataLoader(
+                      full_dataset,
+                      batch_size=batch_size, sampler=valid_subsampler), device)
+
+    # Initialize the model
+    num_classes = len(diseases)
+    model = PretrainedResNet(num_classes=num_classes).to(device)
+
+    print(f'Training for {num_epochs} epochs...')
+    # Train the model
+    best_f1 = train_model(model, train_loader, valid_loader, epochs=num_epochs, lr=0.001)
+    print(f'Best F1 Score for fold {fold+1}: {best_f1:.4f}')
+
+    # Save the model if needed
+    torch.save(model.state_dict(), f'model_fold_{fold+1}.pth')
+
+    # Save fold results
+    fold_results[fold] = best_f1
+
+    print('--------------------------------')
+
+# Print fold results
+print('K-FOLD CROSS VALIDATION RESULTS FOR {} FOLDS'.format(k_folds))
+print('--------------------------------')
+sum_f1 = 0.0
+for key, value in fold_results.items():
+    print(f'Fold {key+1}: Best F1 Score = {value:.4f}')
+    sum_f1 += value
+print('--------------------------------')
+print(f'Average Best F1 Score: {sum_f1/len(fold_results):.4f}')
+
+def load_model(model_path, num_classes):
+    model = PretrainedResNet(num_classes=num_classes)
+    model.load_state_dict(torch.load(model_path))
+    model.eval()
+    return model
