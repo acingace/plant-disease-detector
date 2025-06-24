@@ -25,3 +25,10 @@ Deployment: Local
 
 ## Model Performance
 Overall models have an accuracy of 95% and above
+
+## How To Run The Project
+- Download the dataset
+- Extract it and place it in an accessible directory on your machine.
+- Install Dependencies (use a virtual machine)
+- Run model.py to train the 5 base models
+- Run the Flask App (app.py)
