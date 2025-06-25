@@ -70,7 +70,7 @@ print(f"Using device: {device}")
 model_dir = "/Users/gracegomes/Desktop/Demo"  
 
 # Load base models
-num_classes = 39
+num_classes = 38
 base_models = load_base_models(model_dir, num_classes=num_classes, device=device, num_folds=5)
 if not base_models:
     raise Exception("No base models loaded. Exiting.")
